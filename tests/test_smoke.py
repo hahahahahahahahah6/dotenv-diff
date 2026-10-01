@@ -9,6 +9,9 @@ from pathlib import Path
 
 CLI = Path(__file__).resolve().parent.parent / "dotenv_diff.py"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from dotenv_diff import parse_dotenv  # noqa: E402
+
 
 def run_cli(*args, stdin=None):
     return subprocess.run(
@@ -61,6 +64,21 @@ class TestDotenvDiff(unittest.TestCase):
         self.assertEqual(proc.returncode, 1)
         self.assertIn("missing", proc.stdout)
         self.assertIn("STRIPE_WEBHOOK_SECRET", proc.stdout)
+
+    def test_inline_comment_stripped(self):
+        # Regression: 'A=abc # note' must parse as 'abc', not 'abc # note'.
+        parsed = parse_dotenv(
+            "A=abc # note\n"
+            "B=\"x # y\"\n"      # '#' inside quotes is part of the value
+            "C='p # q'\n"
+            "D=no_comment#tight\n"  # no space before '#': kept
+            "E=\"abc\" # trailing\n"
+        )
+        self.assertEqual(parsed["A"], "abc")
+        self.assertEqual(parsed["B"], "x # y")
+        self.assertEqual(parsed["C"], "p # q")
+        self.assertEqual(parsed["D"], "no_comment#tight")
+        self.assertEqual(parsed["E"], "abc")
 
     def test_clean_exits_0(self):
         with TempFixture(CLEAN_ENV, EXAMPLE) as (env_p, ex_p):

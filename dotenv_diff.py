@@ -29,6 +29,24 @@ def strip_quotes(value: str) -> str:
     return value
 
 
+def strip_inline_comment(value: str) -> str:
+    """Strip a trailing ' # comment' that appears outside of quotes.
+
+    A '#' inside single/double quotes is part of the value; without a
+    preceding space it is also kept (e.g. 'a#b' is a valid value).
+    """
+    quote = None
+    for i, ch in enumerate(value):
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch
+        elif ch == "#" and (i == 0 or value[i - 1] in (" ", "\t")):
+            return value[:i].rstrip()
+    return value
+
+
 def parse_dotenv(text: str) -> dict:
     """Parse KEY=value pairs. Returns dict of KEY -> raw value (unquoted)."""
     result = {}
@@ -45,7 +63,7 @@ def parse_dotenv(text: str) -> dict:
         key = key.strip()
         if not key or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
             continue
-        value = strip_quotes(value.strip())
+        value = strip_quotes(strip_inline_comment(value.strip()).strip())
         result[key] = value
     return result
 
